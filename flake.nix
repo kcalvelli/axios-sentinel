@@ -7,10 +7,52 @@
 
   outputs =
     { self, nixpkgs }:
+    let
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    in
     {
-      nixosModules.default = import ./modules/nixos;
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          buildSentinelBin =
+            name:
+            pkgs.rustPlatform.buildRustPackage {
+              pname = name;
+              version = "0.1.0";
+              src = ./.;
 
-      # TODO: packages for sentinel-agent, sentinel-cli, sentinel-mcp
-      # packages.x86_64-linux = { ... };
+              cargoLock.lockFile = ./Cargo.lock;
+
+              cargoBuildFlags = [
+                "--package"
+                name
+              ];
+
+              nativeBuildInputs = with pkgs; [ pkg-config ];
+              buildInputs = with pkgs; [ openssl ];
+
+              doCheck = false;
+
+              meta = {
+                description = "axios-sentinel ${name}";
+                license = pkgs.lib.licenses.mit;
+                mainProgram = name;
+              };
+            };
+        in
+        {
+          sentinel-agent = buildSentinelBin "sentinel-agent";
+          sentinel-cli = buildSentinelBin "sentinel-cli";
+          sentinel-mcp = buildSentinelBin "sentinel-mcp";
+          default = self.packages.${system}.sentinel-cli;
+        }
+      );
+
+      nixosModules.default = import ./modules/nixos;
     };
 }
