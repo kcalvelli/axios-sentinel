@@ -55,9 +55,18 @@ in
       type = lib.types.package;
       description = "The sentinel-agent package to use";
     };
+
+    cliPackage = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = null;
+      description = "The sentinel-cli package. When set, added to system PATH.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    # Add CLI to system PATH
+    environment.systemPackages = lib.mkIf (cfg.cliPackage != null) [ cfg.cliPackage ];
+
     # Create dedicated system user
     users.users.sentinel = {
       isSystemUser = true;
