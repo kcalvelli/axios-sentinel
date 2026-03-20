@@ -61,11 +61,33 @@ in
       default = null;
       description = "The sentinel-cli package. When set, added to system PATH.";
     };
+
+    fleet = {
+      hosts = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Hostnames of all sentinel-monitored hosts in the fleet.";
+        example = [ "edge" "mini" ];
+      };
+
+      domain = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Tailnet domain for host resolution (e.g., taile0fb4.ts.net).";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
     # Add CLI to system PATH
     environment.systemPackages = lib.mkIf (cfg.cliPackage != null) [ cfg.cliPackage ];
+
+    # Set fleet config as system-wide env vars so sentinel-cli and sentinel-mcp pick them up
+    environment.sessionVariables = lib.mkIf (cfg.fleet.hosts != [ ]) {
+      SENTINEL_HOSTS = lib.concatStringsSep "," cfg.fleet.hosts;
+      SENTINEL_DOMAIN = cfg.fleet.domain;
+      SENTINEL_PORT = toString cfg.port;
+    };
 
     # Create dedicated system user
     users.users.sentinel = {
