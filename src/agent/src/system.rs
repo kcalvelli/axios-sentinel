@@ -166,17 +166,22 @@ pub fn get_temperatures() -> Result<Vec<TemperatureReading>> {
             if let Some(sensors_obj) = sensors.as_object() {
                 for (sensor_name, sensor_data) in sensors_obj {
                     if let Some(data_obj) = sensor_data.as_object() {
-                        // Look for temp*_input fields
+                        // Only process temperature sensors (temp*), skip voltages (in*) and fans (fan*)
+                        let has_temp_field = data_obj.keys().any(|k| k.starts_with("temp"));
+                        if !has_temp_field {
+                            continue;
+                        }
+
                         let mut current = None;
                         let mut high = None;
                         let mut critical = None;
 
                         for (key, val) in data_obj {
-                            if key.ends_with("_input") {
+                            if key.starts_with("temp") && key.ends_with("_input") {
                                 current = val.as_f64();
-                            } else if key.ends_with("_max") {
+                            } else if key.starts_with("temp") && key.ends_with("_max") {
                                 high = val.as_f64();
-                            } else if key.ends_with("_crit") {
+                            } else if key.starts_with("temp") && key.ends_with("_crit") {
                                 critical = val.as_f64();
                             }
                         }
