@@ -43,7 +43,7 @@ impl FleetConfig {
 
         let hosts = std::env::var("SENTINEL_HOSTS")
             .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_else(|_| vec!["edge".into(), "mini".into(), "pangolin".into()]);
+            .unwrap_or_else(|_| vec!["edge".into(), "mini".into()]);
 
         let port = std::env::var("SENTINEL_PORT")
             .ok()
