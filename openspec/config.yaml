@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  axios-sentinel — Autonomous system operations and monitoring for NixOS hosts
+  over Tailscale, designed to give the Sid AI assistant the ability to monitor,
+  diagnose, and remediate issues across a homelab fleet.
+
+  Tech stack: Rust, NixOS modules, MCP (Model Context Protocol), Tailscale
+
+  Architecture:
+  - sentinel-agent: lightweight HTTP daemon on every host (fixed command vocabulary)
+  - sentinel-mcp: MCP server for rich monitoring queries (registered on mcp-gateway)
+  - sentinel-cli: emergency CLI for direct ops when the gateway is down
+  - Shared core library between CLI and MCP server
+
+  Security model:
+  - Tailscale provides authentication (node identity) and encryption
+  - Agents bind to Tailscale interface only
+  - Fixed command vocabulary — no arbitrary command execution
+  - Tiered autonomy: read (always), tier 1 (autonomous), tier 2 (autonomous + notify)
+
+  Related projects:
+  - axios — NixOS framework (imports this as a flake)
+  - sid / zeroclaw — AI agent that consumes sentinel tools
+  - mcp-gateway — aggregates MCP servers (sentinel-mcp registers here)
+  - nixos_config — per-host configuration consuming axios + sentinel
+
+rules:
+  proposal:
+    - Tailscale-first security — no application-level auth, Tailscale IS the auth
+    - Fixed command vocabulary — agents never execute arbitrary commands
+    - Fail-safe design — emergency path (CLI) must work when the rich path (MCP) is down
+    - Minimal footprint — agents should be lightweight, fast to start, low resource usage
+    - Defense in depth — tier enforcement in the agent, not just the caller
