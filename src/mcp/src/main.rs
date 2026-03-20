@@ -33,7 +33,9 @@ async fn main() -> Result<()> {
         };
 
         let response = mcp::handle_request(&client, &request).await;
-        println!("{}", serde_json::to_string(&response)?);
+        if !response.is_null() {
+            println!("{}", serde_json::to_string(&response)?);
+        }
     }
 
     Ok(())

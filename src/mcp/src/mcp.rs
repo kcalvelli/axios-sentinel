@@ -39,7 +39,7 @@ pub async fn handle_request(client: &SentinelClient, request: &Value) -> Value {
             }
         })),
 
-        "notifications/initialized" => Value::Null,
+        "notifications/initialized" => return Value::Null, // No response for notifications
 
         "tools/list" => jsonrpc_result(id, json!({
             "tools": tools_list()
