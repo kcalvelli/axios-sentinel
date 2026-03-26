@@ -89,6 +89,7 @@ in
             { name = "pangolin"; availability = "transient"; }
           ]
         '';
+      };
 
       domain = lib.mkOption {
         type = lib.types.str;
