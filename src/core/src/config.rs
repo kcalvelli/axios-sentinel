@@ -24,13 +24,35 @@ impl Default for TierConfig {
     }
 }
 
+/// Host availability class for fleet health evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Availability {
+    AlwaysOn,
+    Transient,
+}
+
+impl Default for Availability {
+    fn default() -> Self {
+        Self::AlwaysOn
+    }
+}
+
+/// A host in the fleet with its availability class.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostEntry {
+    pub name: String,
+    #[serde(default)]
+    pub availability: Availability,
+}
+
 /// Configuration for connecting to sentinel-agents (used by CLI and MCP server).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FleetConfig {
     /// Tailnet domain (e.g., "taile0fb4.ts.net").
     pub domain: String,
-    /// Host names to monitor.
-    pub hosts: Vec<String>,
+    /// Hosts to monitor with availability classification.
+    pub hosts: Vec<HostEntry>,
     /// Agent port (default 9256).
     pub port: u16,
 }
@@ -42,8 +64,31 @@ impl FleetConfig {
             .unwrap_or_else(|_| "taile0fb4.ts.net".to_string());
 
         let hosts = std::env::var("SENTINEL_HOSTS")
-            .map(|h| h.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_else(|_| vec!["edge".into(), "mini".into()]);
+            .map(|h| {
+                h.split(',')
+                    .map(|s| {
+                        let s = s.trim();
+                        if let Some((name, class)) = s.split_once(':') {
+                            HostEntry {
+                                name: name.to_string(),
+                                availability: match class {
+                                    "transient" => Availability::Transient,
+                                    _ => Availability::AlwaysOn,
+                                },
+                            }
+                        } else {
+                            HostEntry {
+                                name: s.to_string(),
+                                availability: Availability::AlwaysOn,
+                            }
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|_| vec![
+                HostEntry { name: "edge".into(), availability: Availability::AlwaysOn },
+                HostEntry { name: "mini".into(), availability: Availability::AlwaysOn },
+            ]);
 
         let port = std::env::var("SENTINEL_PORT")
             .ok()
@@ -60,5 +105,10 @@ impl FleetConfig {
     /// Construct the agent URL for a given host.
     pub fn agent_url(&self, host: &str) -> String {
         format!("http://{}.{}:{}", host, self.domain, self.port)
+    }
+
+    /// Get just the host names (for callers that don't need availability info).
+    pub fn host_names(&self) -> Vec<&str> {
+        self.hosts.iter().map(|h| h.name.as_str()).collect()
     }
 }

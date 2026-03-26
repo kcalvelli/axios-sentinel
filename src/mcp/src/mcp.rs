@@ -1,4 +1,5 @@
 use sentinel_core::client::SentinelClient;
+use sentinel_core::config::Availability;
 use serde_json::{Value, json};
 
 pub fn jsonrpc_error(id: Value, code: i64, message: &str) -> Value {
@@ -247,10 +248,14 @@ async fn query_host(client: &SentinelClient, host: &str) -> Value {
 
 async fn list_hosts(client: &SentinelClient) -> Value {
     let mut hosts = Vec::new();
-    for host in client.hosts() {
-        let reachable = client.health(host).await.is_ok();
+    for entry in client.hosts() {
+        let reachable = client.health(&entry.name).await.is_ok();
         hosts.push(json!({
-            "host": host,
+            "host": entry.name,
+            "availability": match entry.availability {
+                Availability::AlwaysOn => "always-on",
+                Availability::Transient => "transient",
+            },
             "reachable": reachable,
         }));
     }
@@ -262,23 +267,42 @@ async fn check_fleet_health(client: &SentinelClient) -> Value {
     let mut fleet = json!({});
     let mut overall = "pass";
 
-    for (host, result) in &results {
+    for (entry, result) in &results {
+        let avail_str = match entry.availability {
+            Availability::AlwaysOn => "always-on",
+            Availability::Transient => "transient",
+        };
+
         match result {
             Ok(resp) => {
                 if let Some(data) = &resp.data {
-                    fleet[host] = serde_json::to_value(data).unwrap_or_default();
-                    match data.status {
-                        sentinel_core::types::HealthStatus::Fail => overall = "fail",
-                        sentinel_core::types::HealthStatus::Warn if overall == "pass" => {
-                            overall = "warn";
+                    let mut host_val = serde_json::to_value(data).unwrap_or_default();
+                    host_val["availability"] = json!(avail_str);
+                    fleet[&entry.name] = host_val;
+                    if entry.availability == Availability::AlwaysOn {
+                        match data.status {
+                            sentinel_core::types::HealthStatus::Fail => overall = "fail",
+                            sentinel_core::types::HealthStatus::Warn if overall == "pass" => {
+                                overall = "warn";
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
             Err(e) => {
-                fleet[host] = json!({"status": "unreachable", "error": e.to_string()});
-                overall = "fail";
+                let status_label = match entry.availability {
+                    Availability::AlwaysOn => "unreachable",
+                    Availability::Transient => "offline",
+                };
+                fleet[&entry.name] = json!({
+                    "status": status_label,
+                    "availability": avail_str,
+                    "error": e.to_string()
+                });
+                if entry.availability == Availability::AlwaysOn {
+                    overall = "fail";
+                }
             }
         }
     }

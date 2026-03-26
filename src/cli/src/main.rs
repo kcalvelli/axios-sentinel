@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use sentinel_core::client::SentinelClient;
-use sentinel_core::config::FleetConfig;
+use sentinel_core::config::{Availability, FleetConfig};
 
 #[derive(Parser)]
 #[command(name = "sentinel-cli", about = "Direct access to sentinel-agents over Tailscale")]
@@ -177,9 +177,13 @@ async fn run_all(
         Commands::Health => {
             let results = client.check_fleet_health().await;
             if json_output {
-                println!("{}", serde_json::to_string_pretty(&results.iter().map(|(h, r)| {
+                println!("{}", serde_json::to_string_pretty(&results.iter().map(|(entry, r)| {
                     serde_json::json!({
-                        "host": h,
+                        "host": entry.name,
+                        "availability": match entry.availability {
+                            Availability::AlwaysOn => "always-on",
+                            Availability::Transient => "transient",
+                        },
                         "result": match r {
                             Ok(resp) => serde_json::to_value(resp).unwrap_or_default(),
                             Err(e) => serde_json::json!({"error": e.to_string()}),
@@ -187,9 +191,13 @@ async fn run_all(
                     })
                 }).collect::<Vec<_>>())?);
             } else {
-                println!("{:<15} {:<8} {}", "HOST", "STATUS", "DETAILS");
-                println!("{}", "-".repeat(60));
-                for (host, result) in &results {
+                println!("{:<15} {:<10} {:<12} {}", "HOST", "STATUS", "AVAIL", "DETAILS");
+                println!("{}", "-".repeat(72));
+                for (entry, result) in &results {
+                    let avail = match entry.availability {
+                        Availability::AlwaysOn => "always-on",
+                        Availability::Transient => "transient",
+                    };
                     match result {
                         Ok(resp) => {
                             if let Some(data) = &resp.data {
@@ -199,24 +207,32 @@ async fn run_all(
                                     .map(|c| format!("{}: {}", c.name, c.message))
                                     .collect();
                                 println!(
-                                    "{:<15} {:<8} {}",
-                                    host,
+                                    "{:<15} {:<10} {:<12} {}",
+                                    entry.name,
                                     format!("{:?}", data.status).to_lowercase(),
+                                    avail,
                                     details.join("; ")
                                 );
                             }
                         }
                         Err(e) => {
-                            println!("{:<15} {:<8} {}", host, "ERROR", e);
+                            match entry.availability {
+                                Availability::AlwaysOn => {
+                                    println!("{:<15} {:<10} {:<12} {}", entry.name, "ERROR", avail, e);
+                                }
+                                Availability::Transient => {
+                                    println!("{:<15} {:<10} {:<12} {}", entry.name, "offline", avail, "(not expected to be always reachable)");
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         Commands::Status => {
-            for host in &config.hosts {
-                println!("--- {} ---", host);
-                if let Err(e) = run_single(client, host, command, json_output).await {
+            for entry in &config.hosts {
+                println!("--- {} ---", entry.name);
+                if let Err(e) = run_single(client, &entry.name, command, json_output).await {
                     eprintln!("  Error: {e}");
                 }
                 println!();
@@ -224,9 +240,9 @@ async fn run_all(
         }
         _ => {
             // For other commands on "all", run sequentially
-            for host in &config.hosts {
-                println!("--- {} ---", host);
-                if let Err(e) = run_single(client, host, command, json_output).await {
+            for entry in &config.hosts {
+                println!("--- {} ---", entry.name);
+                if let Err(e) = run_single(client, &entry.name, command, json_output).await {
                     eprintln!("  Error: {e}");
                 }
                 println!();

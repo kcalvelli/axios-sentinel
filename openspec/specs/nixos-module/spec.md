@@ -44,6 +44,25 @@ The NixOS module SHALL open the agent's port on the Tailscale interface only.
 - **WHEN** `services.sentinel.agent.enable = true` with default port 9256
 - **THEN** `networking.firewall.interfaces."tailscale0".allowedTCPPorts` includes 9256
 
+### Requirement: NixOS module supports host availability classes in fleet config
+The `services.sentinel.agent.fleet.hosts` option SHALL accept both plain hostname strings (backward compatible) and attribute sets with `name` and `availability` fields.
+
+#### Scenario: Plain string hosts (backward compatible)
+- **WHEN** `fleet.hosts = [ "edge" "mini" ]` is set
+- **THEN** both hosts are treated as `always-on` and `SENTINEL_HOSTS` is set to `"edge,mini"`
+
+#### Scenario: Hosts with availability classes
+- **WHEN** `fleet.hosts = [ { name = "edge"; } { name = "mini"; } { name = "pangolin"; availability = "transient"; } ]` is set
+- **THEN** `SENTINEL_HOSTS` is set to `"edge,mini,pangolin:transient"` — hosts without explicit availability default to `always-on` and are serialized without a suffix
+
+#### Scenario: Mixed string and attrset hosts
+- **WHEN** `fleet.hosts = [ "edge" "mini" { name = "pangolin"; availability = "transient"; } ]` is set
+- **THEN** `SENTINEL_HOSTS` is set to `"edge,mini,pangolin:transient"`
+
+#### Scenario: Invalid availability class
+- **WHEN** `fleet.hosts = [ { name = "edge"; availability = "sometimes"; } ]` is set
+- **THEN** NixOS evaluation fails with a type error — only `"always-on"` and `"transient"` are accepted
+
 ### Requirement: Flake exports packages and NixOS module
 The axios-sentinel flake SHALL export `nixosModules.default`, `packages.x86_64-linux.sentinel-agent`, `packages.x86_64-linux.sentinel-cli`, and `packages.x86_64-linux.sentinel-mcp`.
 

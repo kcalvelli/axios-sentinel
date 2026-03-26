@@ -1,4 +1,4 @@
-use crate::config::FleetConfig;
+use crate::config::{FleetConfig, HostEntry};
 use crate::types::*;
 use anyhow::{Context, Result};
 use reqwest::Client;
@@ -126,22 +126,22 @@ impl SentinelClient {
     }
 
     /// Get the list of configured hosts.
-    pub fn hosts(&self) -> &[String] {
+    pub fn hosts(&self) -> &[HostEntry] {
         &self.config.hosts
     }
 
     /// Check connectivity to all hosts in parallel.
-    pub async fn check_fleet_health(&self) -> Vec<(String, Result<AgentResponse<HealthCheck>>)> {
+    pub async fn check_fleet_health(&self) -> Vec<(HostEntry, Result<AgentResponse<HealthCheck>>)> {
         let futures: Vec<_> = self
             .config
             .hosts
             .iter()
-            .map(|host| {
-                let host = host.clone();
+            .map(|entry| {
+                let entry = entry.clone();
                 let this = &self;
                 async move {
-                    let result = this.health(&host).await;
-                    (host, result)
+                    let result = this.health(&entry.name).await;
+                    (entry, result)
                 }
             })
             .collect();

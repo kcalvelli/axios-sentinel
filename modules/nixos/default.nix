@@ -64,11 +64,31 @@ in
 
     fleet = {
       hosts = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
+        type = lib.types.listOf (lib.types.either
+          lib.types.str
+          (lib.types.submodule {
+            options = {
+              name = lib.mkOption {
+                type = lib.types.str;
+                description = "Hostname of the fleet member.";
+              };
+              availability = lib.mkOption {
+                type = lib.types.enum [ "always-on" "transient" ];
+                default = "always-on";
+                description = "Availability class: always-on (expected to be reachable) or transient (may be offline).";
+              };
+            };
+          })
+        );
         default = [ ];
-        description = "Hostnames of all sentinel-monitored hosts in the fleet.";
-        example = [ "edge" "mini" ];
-      };
+        description = "Hostnames of all sentinel-monitored hosts in the fleet. Each entry is either a plain hostname string (treated as always-on) or an attrset with name and availability.";
+        example = lib.literalExpression ''
+          [
+            "edge"
+            "mini"
+            { name = "pangolin"; availability = "transient"; }
+          ]
+        '';
 
       domain = lib.mkOption {
         type = lib.types.str;
@@ -84,7 +104,11 @@ in
 
     # Set fleet config as system-wide env vars so sentinel-cli and sentinel-mcp pick them up
     environment.sessionVariables = lib.mkIf (cfg.fleet.hosts != [ ]) {
-      SENTINEL_HOSTS = lib.concatStringsSep "," cfg.fleet.hosts;
+      SENTINEL_HOSTS = lib.concatStringsSep "," (map (h:
+        if builtins.isString h then h
+        else if h.availability == "always-on" then h.name
+        else "${h.name}:${h.availability}"
+      ) cfg.fleet.hosts);
       SENTINEL_DOMAIN = cfg.fleet.domain;
       SENTINEL_PORT = toString cfg.port;
     };
