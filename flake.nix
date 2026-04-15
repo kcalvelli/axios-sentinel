@@ -39,7 +39,7 @@
               doCheck = false;
 
               meta = {
-                description = "axios-sentinel ${name}";
+                description = "cairn-sentinel ${name}";
                 license = pkgs.lib.licenses.mit;
                 mainProgram = name;
               };

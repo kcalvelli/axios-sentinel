@@ -1,6 +1,6 @@
 ## Context
 
-The axios homelab runs three NixOS hosts (edge, mini, pangolin) connected via Tailscale. The Sid AI assistant runs on mini as a ZeroClaw daemon. Today, Sid has no visibility into host health and no ability to take corrective action when systems fail.
+The cairn homelab runs three NixOS hosts (edge, mini, pangolin) connected via Tailscale. The Sid AI assistant runs on mini as a ZeroClaw daemon. Today, Sid has no visibility into host health and no ability to take corrective action when systems fail.
 
 The March 20, 2026 incident demonstrated the gap: edge's GPU hung, killing the compositor and network services. The system sat unresponsive for ~2 hours until manual intervention. Sid had no way to detect, diagnose, or fix the problem — and couldn't even reach its own tools since they route through edge's mcp-gateway.
 
@@ -10,8 +10,8 @@ The March 20, 2026 incident demonstrated the gap: edge's GPU hung, killing the c
 - ZeroClaw has no native MCP client — all external tools go through `mcp-gw`
 
 **Constraints:**
-- Agent must be a standalone flake (like sid, mcp-gateway, axios-dav)
-- Imported into nixos_config alongside axios
+- Agent must be a standalone flake (like sid, mcp-gateway, cairn-dav)
+- Imported into nixos_config alongside cairn
 - No changes to ZeroClaw's MCP handling (Sid uses shell for the emergency path)
 - Tailscale provides authentication — no application-level auth
 
@@ -22,7 +22,7 @@ The March 20, 2026 incident demonstrated the gap: edge's GPU hung, killing the c
 - Emergency operations work even when edge's mcp-gateway is down
 - Fixed command vocabulary — the agent never executes arbitrary commands
 - Per-host configuration of which operations are permitted
-- NixOS module with clean declarative API, consistent with axios patterns
+- NixOS module with clean declarative API, consistent with cairn patterns
 
 **Non-Goals:**
 - No Prometheus or time-series metrics in v1 (point-in-time queries only)
@@ -89,7 +89,7 @@ The March 20, 2026 incident demonstrated the gap: edge's GPU hung, killing the c
 
 ### Decision 6: Nix flake structure
 
-**Choice:** Standalone flake (`axios-sentinel`) with:
+**Choice:** Standalone flake (`cairn-sentinel`) with:
 - `nixosModules.default` — the agent NixOS module
 - `packages.x86_64-linux.sentinel-agent` — the agent daemon
 - `packages.x86_64-linux.sentinel-cli` — the emergency CLI
@@ -97,7 +97,7 @@ The March 20, 2026 incident demonstrated the gap: edge's GPU hung, killing the c
 
 Imported into `nixos_config/flake.nix` as an input. sentinel-mcp is registered on edge's mcp-gateway in `edge.nix` home-manager config (same pattern as zeroclaw-mcp). sentinel-cli is added to Sid's PATH via `services.sid.extraPackages` in `mini.nix`.
 
-**Rationale:** Follows the established pattern (sid, mcp-gateway, axios-dav are all standalone flakes imported into nixos_config). Keeps axios itself focused on framework concerns.
+**Rationale:** Follows the established pattern (sid, mcp-gateway, cairn-dav are all standalone flakes imported into nixos_config). Keeps cairn itself focused on framework concerns.
 
 ## Risks / Trade-offs
 
@@ -119,4 +119,4 @@ Imported into `nixos_config/flake.nix` as an input. sentinel-mcp is registered o
 
 2. **Health check semantics:** What constitutes "healthy" vs "warning" vs "failed"? Need to define thresholds (e.g., disk > 90% = warning, any failed systemd unit = warning, host unreachable = failed). These could be configurable or hardcoded for v1.
 
-3. **Should the agent auto-register with Tailscale Services?** Like Ollama does (`axios-sentinel.tailnet.ts.net`). This would enable service discovery instead of hardcoding host lists. Trade-off: adds Tailscale API dependency to the agent.
+3. **Should the agent auto-register with Tailscale Services?** Like Ollama does (`cairn-sentinel.tailnet.ts.net`). This would enable service discovery instead of hardcoding host lists. Trade-off: adds Tailscale API dependency to the agent.

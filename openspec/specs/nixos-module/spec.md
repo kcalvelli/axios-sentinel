@@ -64,10 +64,10 @@ The `services.sentinel.agent.fleet.hosts` option SHALL accept both plain hostnam
 - **THEN** NixOS evaluation fails with a type error — only `"always-on"` and `"transient"` are accepted
 
 ### Requirement: Flake exports packages and NixOS module
-The axios-sentinel flake SHALL export `nixosModules.default`, `packages.x86_64-linux.sentinel-agent`, `packages.x86_64-linux.sentinel-cli`, and `packages.x86_64-linux.sentinel-mcp`.
+The cairn-sentinel flake SHALL export `nixosModules.default`, `packages.x86_64-linux.sentinel-agent`, `packages.x86_64-linux.sentinel-cli`, and `packages.x86_64-linux.sentinel-mcp`.
 
 #### Scenario: Import as flake input
-- **WHEN** `inputs.sentinel.url = "github:kcalvelli/axios-sentinel"` is added to nixos_config's flake.nix
+- **WHEN** `inputs.sentinel.url = "github:kcalvelli/cairn-sentinel"` is added to nixos_config's flake.nix
 - **THEN** `inputs.sentinel.nixosModules.default` can be imported, and `inputs.sentinel.packages.x86_64-linux.sentinel-cli` is available for adding to Sid's PATH
 
 #### Scenario: Register sentinel-mcp on mcp-gateway

@@ -1,4 +1,4 @@
-# Proposal: axios-sentinel — Autonomous System Operations for Sid
+# Proposal: cairn-sentinel — Autonomous System Operations for Sid
 
 ## Summary
 
